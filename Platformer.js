@@ -84,7 +84,8 @@ createGame(function (R) {
         if ((btn.a && !pbtn.a) || (btn.b && !pbtn.b)) {
             if (this.selection == 0) {
                 this.draw = this.mapBuilderUpdate;
-                if (!this.mapBuilder) this.mapBuilder = new MapBuilder(this);
+                // if (!this.mapBuilder)
+                this.mapBuilder = new MapBuilder(this);
             }
             else this.draw = this.lastUpdate; // if button pressed go to game loop
         }
