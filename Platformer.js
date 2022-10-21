@@ -115,7 +115,7 @@ createGame(function (R) {
         if (s.length == 1) s = "0" + s;
         R.put(s, 38 - 9, 35, 22);
 
-        if ((btn.a && !pbtn.a) || (btn.b && !pbtn.b) || (btn.up && !pbtn.up)) newGame(0); // if button pressed start new game
+        if ((btn.a && !pbtn.a) || (btn.b && !pbtn.b) || (btn.up && !pbtn.up)) newGame(this.mapIndex || 0); // if button pressed start new game
 
         if (curtainY > 0) {
             curtainY -= 2;
@@ -140,8 +140,9 @@ createGame(function (R) {
         this.cat.update();
         for (let i = this.actors.length - 1; i >= 0; i--) this.actors[i].update();
 
-        // this.camera.set(this.cat.pos.x - 32, this.cat.pos.y - 24);
-        this.camera.set(floor(this.cat.pos.x / 64) * 64, min(floor(this.cat.pos.y / 48) * 48, 48));
+        let cameraDest = createVector(this.cat.pos.x - 32, this.cat.pos.y - 24);
+        if(!this.cat.dead) this.camera.add(cameraDest.sub(this.camera).div(4));
+        // this.camera.set(floor(this.cat.pos.x / 64) * 64, min(floor(this.cat.pos.y / 48) * 48, 48));
 
         for (let i = this.actors.length - 1; i >= 0; i--) this.actors[i].draw();
         this.cat.draw();
@@ -248,8 +249,8 @@ createGame(function (R) {
         let jumpDir = 0;
 
         this.collided = () => {
-            if (this.pos.x < 0 || this.pos.x + this.size.x > game.width * 2) return true;
-            if (this.pos.y < 0 /*|| this.pos.y + this.size.y > game.height * 2*/) return true;
+            // if (this.pos.x < 0 || this.pos.x + this.size.x > game.width * 2) return true;
+            // if (this.pos.y < 0 /*|| this.pos.y + this.size.y > game.height * 2*/) return true;
 
             // for (let b of game.blocks) if (this.hit(b)) return b;
             let hitblock = false;
@@ -257,6 +258,11 @@ createGame(function (R) {
             let corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
             for (let i = 0; i < corners.length; i++) {
                 let pos = createVector(floor((this.pos.x + corners[i][0] * (this.size.x - 1)) / 8), floor((this.pos.y + corners[i][1] * (this.size.y - 1)) / 8));
+                
+                // check out of bounds
+                if (pos.x < 0 || pos.x >= game.width * 2 / 8) continue;
+                if (pos.y < 0 || pos.y >= game.height * 2 / 8) continue;
+                
                 if (game.map[pos.x + pos.y * MW] == 1) hitblock = true;
             }
             if (hitblock) return true;
@@ -476,7 +482,7 @@ createGame(function (R) {
     }
 
     let getTileValue = (x, y) => {
-        if (x < 0 || x >= MW || y < 0 || y >= MH) return 1;
+        if (x < 0 || x >= MW || y < 0 || y >= MH) return 0;
         else return this.map[x + y * MW] == 1 ? 1 : 0;
     }
 
