@@ -37,7 +37,7 @@ createGame(function (R) {
         this.mapIndex = map;
         this.map = this.maps[this.mapIndex];
 
-        let mapHasKey = false;
+        let nKeys = 0;
 
         for (let i = 0; i < this.map.length; i++) {
             if (this.map[i] == 3) new Coin(this, (i % MW) * 8, floor(i / MW) * 8);
@@ -45,11 +45,11 @@ createGame(function (R) {
             if (this.map[i] == 5) this.door = new Door(this, (i % MW) * 8, floor(i / MW) * 8);
             if (this.map[i] == 6) {
                 new Key(this, (i % MW) * 8, floor(i / MW) * 8);
-                mapHasKey = true;
+                nKeys++;
             }
         }
 
-        if (mapHasKey) this.door.open = false;
+        this.door.open = nKeys;
 
         if (!this.cat) {
             this.selection = 0;
@@ -120,7 +120,7 @@ createGame(function (R) {
         if (curtainY > 0) {
             curtainY -= 2;
 
-            R.palset(1);
+            R.palset(22);
             R.fillRect(0, 48 - curtainY, 64, 48);
         }
 
@@ -140,21 +140,22 @@ createGame(function (R) {
         this.cat.update();
         for (let i = this.actors.length - 1; i >= 0; i--) this.actors[i].update();
 
-        let cameraDest = createVector(this.cat.pos.x - 32, this.cat.pos.y - 24);
-        if(!this.cat.dead) this.camera.add(cameraDest.sub(this.camera).div(4));
+        let cameraDest = createVector(this.cat.pos.x - 32, this.cat.pos.y - 30);
+        if(cameraDest.y > this.height) cameraDest.y = this.height;
+        this.camera.add(cameraDest.sub(this.camera).div(4));
         // this.camera.set(floor(this.cat.pos.x / 64) * 64, min(floor(this.cat.pos.y / 48) * 48, 48));
 
         for (let i = this.actors.length - 1; i >= 0; i--) this.actors[i].draw();
         this.cat.draw();
         this.displayMap();
 
-        if (this.door.open && this.cat.within(this.door)) newGame((this.mapIndex + 1) % this.maps.length);
+        if (this.door.open == 0 && this.cat.within(this.door)) newGame((this.mapIndex + 1) % this.maps.length);
 
         if (this.cat.dead && this.cat.pos.y > 48 + 16 && this.cat.vel.y > 0) {
-            if (curtainY > 48) this.draw = this.title;
             curtainY += 2;
+            if (curtainY > 48) this.draw = this.title;
 
-            R.palset(1);
+            R.palset(22);
             R.fillRect(0, 0, 64, curtainY);
         }
 
@@ -196,10 +197,14 @@ createGame(function (R) {
         this.pos = createVector(x, y);
         this.vel = createVector();
 
-        this.open = true;
+        this.open = 0;
 
         this.draw = () => {
-            R.spr([this.open ? 112 : 104, 8], this.pos.x - game.camera.x, this.pos.y - game.camera.y);
+            R.spr([this.open == 0 ? 112 : 104, 8], this.pos.x - game.camera.x, this.pos.y - game.camera.y);
+
+            for(let i = 0; i < this.open; i++) {
+                R.spr([124, 0], this.pos.x - game.camera.x + i * 5 + 4 - this.open * 2, this.pos.y - game.camera.y - 5, 4, 4);
+            }
         }
 
         this.update = () => {
@@ -212,7 +217,8 @@ createGame(function (R) {
         this.pos = createVector(x + 2, y + 1);
         this.vel = createVector();
 
-        this.collected = false;
+        this.parent = false;
+        this.child = false;
 
         this.draw = () => {
             R.lset(1);
@@ -220,21 +226,39 @@ createGame(function (R) {
         }
 
         this.update = () => {
-            if (game.cat.hit(this) && !this.collected) {
-                this.collected = true;
+            if (game.cat.hit(this) && !this.parent) {
+
+                if(game.cat.items.length) this.parent = game.cat.items[game.cat.items.length-1];
+                else this.parent = game.cat;
+
+                this.parent.child = this;
+                game.cat.items.push(this);
             }
 
-            if (!this.collected) return;
+            if (!this.parent) return;
 
-            let dest = game.cat.pos.copy();
-            dest.add(game.cat.dir ? 5 : -5, -2);
+            let dest = this.parent.pos.copy();
+            if(this.parent != game.door) dest.add(game.cat.dir ? 5 : -5, this.parent == game.cat ? -2 : 0);
 
             this.pos.add(dest.sub(this.pos).div(8));
 
-            if (game.cat.hit(game.door) && !game.door.open) {
-                game.door.open = true;
+            if (game.cat.hit(game.door) && this.parent != game.door) {
+                game.cat.items.splice(game.cat.items.indexOf(this), 1);
+                this.child.parent = this.parent;
+
+                this.parent = game.door;
+            }
+
+            if(this.hit(game.door)) {
+                game.door.open--;
                 game.actors.splice(game.actors.indexOf(this), 1);
             }
+        }
+
+        this.hit = (b) => {
+            let x = this.pos.x < b.pos.x + b.size.x && this.pos.x + this.size.x > b.pos.x;
+            let y = this.pos.y < b.pos.y + b.size.y && this.pos.y + this.size.y > b.pos.y;
+            return x && y;
         }
     }
 
@@ -247,6 +271,8 @@ createGame(function (R) {
         this.grounded = false;
         this.wallded = false;
         let jumpDir = 0;
+
+        this.items = [];
 
         this.collided = () => {
             // if (this.pos.x < 0 || this.pos.x + this.size.x > game.width * 2) return true;
@@ -441,9 +467,10 @@ createGame(function (R) {
 
         R.palset(22, 1);
 
-        for (let i = 0; i < 8; i++) {
+        // water
+        for (let i = 0; i < 10; i++) {
             let t = floor(frameCount / 15) % 4;
-            R.spr([t % 2 == 0 ? 120 : 118, 5], i * 8, 48 + 44 - this.camera.y, 8, 2, t == 3, t == 2 ? PI : 0);
+            R.spr([t % 2 == 0 ? 120 : 118, 5], i * 8 - this.camera.x % 8 - 8, 48 + 44 - this.camera.y, 8, 2, t == 3, t == 2 ? PI : 0);
         }
 
         for (let i = 0; i < this.map.length; i++) {
@@ -660,7 +687,7 @@ createGame(function (R) {
         }
 
         let getTileValue = (x, y) => {
-            if (x < 0 || x >= MW || y < 0 || y >= MH) return 1;
+            if (x < 0 || x >= MW || y < 0 || y >= MH) return 0;
             else return this.map[x + y * MW] == 1 ? 1 : 0;
         }
     }
