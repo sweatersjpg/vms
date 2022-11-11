@@ -249,7 +249,7 @@ createGame(function (R) {
                 this.parent = game.door;
             }
 
-            if(this.hit(game.door)) {
+            if(this.hit(game.door) && this.parent == game.door) {
                 game.door.open--;
                 game.actors.splice(game.actors.indexOf(this), 1);
             }
